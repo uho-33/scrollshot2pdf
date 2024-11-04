@@ -130,8 +130,49 @@ def calculate_slices(image_height: int, page_height: int, content_gaps: List[int
 
     return slices
 
+def title_from_filename(filename: str) -> str:
+    """Convert filename to title, without extension and titlecased if all lowercase."""
+    # Remove extension and directory path
+    base = os.path.splitext(os.path.basename(filename))[0]
+    # Only titlecase if the string is all lowercase
+    if base.islower():
+        return base.replace('_', ' ').replace('-', ' ').title()
+    return base.replace('_', ' ').replace('-', ' ')
+
+def parse_page_range(range_str: str, total_pages: int) -> Tuple[int, int]:
+    """Parse page range string into start and end page numbers (1-based)."""
+    if not range_str:
+        return 1, total_pages
+
+    try:
+        if '-' in range_str:
+            start_str, end_str = range_str.split('-', 1)
+            start = int(start_str) if start_str else 1
+            end = int(end_str) if end_str else total_pages
+        else:
+            start = end = int(range_str)
+
+        # Validate range
+        if start < 1 or end > total_pages or start > end:
+            raise ValueError
+
+        return start, end
+
+    except ValueError:
+        raise ValueError(f"Invalid page range. Format: N, N-M, N-, -M (1 to {total_pages})")
+
 def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, float],
-               margin_points: float, min_gap_size: int = 50) -> None:
+               margin_points: float, min_gap_size: int = 50, *,
+               add_page_numbers: bool = True,
+               number_position: str = 'bottom-left',
+               number_font: str = 'Helvetica',
+               number_size: int = 10,
+               skip_first_number: bool = True,
+               title: str = None,
+               title_position: str = 'center',
+               title_font: str = 'Helvetica-Bold',
+               title_size: int = 14,
+               page_range: str = None) -> None:
     """Create PDF from image, splitting it into pages."""
     print("Analyzing image dimensions and calculating layout...")
     page_width, page_height = page_size
@@ -151,9 +192,66 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
     total_pages = len(slices)
     print(f"Image will be split into {total_pages} pages")
 
+    # Parse page range
+    try:
+        start_page, end_page = parse_page_range(page_range, total_pages)
+    except ValueError as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+
+    # Filter slices based on page range
+    slices = slices[start_page-1:end_page]
+    print(f"Processing pages {start_page} to {end_page} of {total_pages}")
+
+    def add_page_number(canvas, page_num):
+        if skip_first_number and page_num == 1:
+            return
+
+        # Calculate position based on margins and position choice
+        if 'bottom' in number_position:
+            y = margin_points + number_size/2
+        else:  # top
+            y = page_height - margin_points - number_size/2
+
+        if 'left' in number_position:
+            x = margin_points
+        else:  # right
+            x = page_width - margin_points
+            canvas.setRightMargin(margin_points)
+
+        canvas.setFont(number_font, number_size)
+        text = str(page_num)
+        if 'right' in number_position:
+            text_width = canvas.stringWidth(text, number_font, number_size)
+            x -= text_width
+        canvas.drawString(x, y, text)
+
+    def add_title(canvas):
+        if not title:
+            return
+
+        canvas.setFont(title_font, title_size)
+        text_width = canvas.stringWidth(title, title_font, title_size)
+
+        # Calculate y position (at top of page)
+        y = page_height - margin_points - title_size
+
+        # Calculate x position based on alignment
+        if title_position == 'left':
+            x = margin_points
+        elif title_position == 'right':
+            x = page_width - margin_points - text_width
+        else:  # center
+            x = (page_width - text_width) / 2
+
+        canvas.drawString(x, y, title)
+
     # Create PDF
     print(f"Creating PDF: {output_path}")
     c = canvas.Canvas(output_path, pagesize=page_size)
+
+    # Add title to first page only
+    add_title(c)
 
     for i, (start_y, end_y) in enumerate(slices, 1):
         print(f"Processing page {i}/{total_pages}...")
@@ -178,6 +276,10 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
         # Remove temporary file
         os.remove(temp_slice_path)
 
+        # Add page number if enabled
+        if add_page_numbers:
+            add_page_number(c, i)
+
         # Add new page if not last slice
         if i < total_pages:
             c.showPage()
@@ -196,6 +298,35 @@ def main():
     parser.add_argument('--min-gap', '-g', type=int, default=50,
                        help='Minimum gap size in pixels to consider for page breaks (default: 50)')
 
+    # Add page numbering arguments
+    parser.add_argument('--page-numbers', action='store_true', default=True,
+                       help='Add page numbers (default)')
+    parser.add_argument('--no-page-numbers', action='store_false', dest='page_numbers',
+                       help='Disable page numbers')
+    parser.add_argument('--number-position', choices=['bottom-left', 'bottom-right',
+                                                    'top-left', 'top-right'],
+                       default='bottom-left', help='Position of page numbers')
+    parser.add_argument('--number-font', default='Helvetica',
+                       help='Font for page numbers')
+    parser.add_argument('--number-size', type=int, default=10,
+                       help='Font size for page numbers in points')
+    parser.add_argument('--skip-first-number', action='store_true', default=True,
+                       help='Skip page number on first page')
+
+    # Add title arguments
+    parser.add_argument('--title',
+                       help='Add title to first page. Use "from-filename" to use input filename')
+    parser.add_argument('--title-position', choices=['left', 'center', 'right'],
+                       default='center', help='Position of title')
+    parser.add_argument('--title-font', default='Helvetica-Bold',
+                       help='Font for title')
+    parser.add_argument('--title-size', type=int, default=14,
+                       help='Font size for title in points')
+
+    # Add page range option
+    parser.add_argument('--page-range',
+                       help='Page range to output (e.g., 5, 5-10)')
+
     args = parser.parse_args()
 
     # Set output filename if not specified
@@ -206,6 +337,14 @@ def main():
     # Convert margin to pixels
     margin_points = parse_margin(args.margin)
 
+    # Process title if specified
+    title = None
+    if args.title:
+        if args.title == 'from-filename':
+            title = title_from_filename(args.input_file)
+        else:
+            title = args.title
+
     try:
         print(f"Opening image: {args.input_file}")
         # Open and trim image
@@ -214,8 +353,18 @@ def main():
             trimmed_img = trim_whitespace(img)
 
             # Create PDF
-            create_pdf(trimmed_img, args.output, PAGE_SIZES[args.page_size],
-                      margin_points, args.min_gap)
+            create_pdf(trimmed_img, args.output, PAGE_SIZES[args.page_size.lower()],
+                      margin_points, args.min_gap,
+                      add_page_numbers=args.page_numbers,
+                      number_position=args.number_position,
+                      number_font=args.number_font,
+                      number_size=args.number_size,
+                      skip_first_number=args.skip_first_number,
+                      title=title,
+                      title_position=args.title_position,
+                      title_font=args.title_font,
+                      title_size=args.title_size,
+                      page_range=args.page_range)
 
         print(f"Successfully created PDF: {args.output}")
 

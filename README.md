@@ -29,6 +29,16 @@ With options:
 ./image_to_pdf.py input_image.png -o output.pdf --page-size a4 --margin 25mm --min-gap 100
 ```
 
+With customized page numbers:
+```bash
+./image_to_pdf.py input.png --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
+```
+
+With page range selection:
+```bash
+./image_to_pdf.py input.png --page-range 5 --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
+```
+
 ### Command-line Arguments
 
 - `input_file`: Path to input image (required)
@@ -36,6 +46,13 @@ With options:
 - `--page-size`, `-p`: Page size (default: a4)
 - `--margin`, `-m`: Margin size (default: 20mm)
 - `--min-gap`, `-g`: Minimum gap size in pixels to consider for page breaks (default: 50)
+- `--page-range`: Page range to output (e.g., 5, 5-10, 5-, -10)
+- `--page-numbers`: Add page numbers (default)
+- `--no-page-numbers`: Disable page numbers
+- `--number-position`: Position of page numbers (default: bottom-left, choices: bottom-left, bottom-right, top-left, top-right)
+- `--number-font`: Font for page numbers (default: Helvetica)
+- `--number-size`: Font size for page numbers in points (default: 10)
+- `--skip-first-number`: Skip page number on first page (default: True)
 
 ### Page Sizes
 
