@@ -38,11 +38,19 @@ With options:
 - `--min-gap`, `-g`: Minimum gap size in pixels to consider for page breaks (default: 50)
 
 ### Page Sizes
-Available page sizes:
-- A4 (default)
-- A3
-- A5
-- Letter
+
+All standard paper sizes from ReportLab are supported, including:
+- ISO A series (A0-A6)
+- ISO B series (B0-B6)
+- North American sizes (Letter, Legal, Tabloid, etc.)
+
+Each size is also available in landscape orientation by adding "-landscape" to the name. For example:
+- a4
+- a4-landscape
+- letter
+- letter-landscape
+
+Run `./image_to_pdf.py --help` to see the complete list of available page sizes.
 
 ### Margin Format
 Margins can be specified in:

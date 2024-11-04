@@ -9,32 +9,39 @@
 import argparse
 from PIL import Image, ImageOps
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, A3, A5, LETTER
+from reportlab.lib import pagesizes
 import os
 import sys
 from typing import Tuple, List
 
-# Standard page sizes in pixels at 72 DPI
-PAGE_SIZES = {
-    'a4': A4,
-    'a3': A3,
-    'a5': A5,
-    'letter': LETTER
-}
+# Get all paper sizes from reportlab
+PAGE_SIZES = {name.lower(): getattr(pagesizes, name)
+              for name in dir(pagesizes)
+              if name.isupper() and isinstance(getattr(pagesizes, name), tuple)}
+
+# Add landscape variants
+PAGE_SIZES.update({
+    f'{name}-landscape': (height, width)
+    for name, (width, height) in PAGE_SIZES.items()
+})
 
 def mm_to_pixels(mm: float, dpi: int = 72) -> int:
     """Convert millimeters to pixels at given DPI."""
     return int(mm * dpi / 25.4)
 
-def parse_margin(margin_str: str) -> int:
-    """Parse margin string (either pixels or mm) to pixels."""
+def mm_to_points(mm: float) -> float:
+    """Convert millimeters to points (1/72 inch)."""
+    return mm * 72 / 25.4  # 1 inch = 25.4mm, 1 inch = 72 points
+
+def parse_margin(margin_str: str) -> float:
+    """Parse margin string (either pixels or mm) to points."""
     if margin_str.endswith('mm'):
-        return mm_to_pixels(float(margin_str[:-2]))
+        return mm_to_points(float(margin_str[:-2]))
     elif margin_str.endswith('px'):
-        return int(margin_str[:-2])
+        return float(margin_str[:-2]) * 72 / 96  # Assuming 96 DPI for pixels
     else:
         try:
-            return int(margin_str)
+            return float(margin_str) * 72 / 96  # Treat bare numbers as pixels
         except ValueError:
             raise ValueError("Margin must be specified in px, mm, or as plain pixels")
 
@@ -124,26 +131,33 @@ def calculate_slices(image_height: int, page_height: int, content_gaps: List[int
     return slices
 
 def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, float],
-               margin_pixels: int, min_gap_size: int = 50) -> None:
+               margin_points: float, min_gap_size: int = 50) -> None:
     """Create PDF from image, splitting it into pages."""
+    print("Analyzing image dimensions and calculating layout...")
     page_width, page_height = page_size
-    usable_width = page_width - 2 * margin_pixels
-    usable_height = page_height - 2 * margin_pixels
+    usable_width = page_width - 2 * margin_points
+    usable_height = page_height - 2 * margin_points
 
     # Calculate scale factor to fit width while preserving aspect ratio
     scale_factor = usable_width / image.size[0]
 
     # Find content gaps in original image (no scaling)
+    print("Finding content gaps for optimal page breaks...")
     content_gaps = find_content_gaps(image, min_gap_size)
 
     # Calculate slice positions using scaled height
     scaled_usable_height = int(usable_height / scale_factor)  # Convert page height to original image scale
     slices = calculate_slices(image.size[1], scaled_usable_height, content_gaps)
+    total_pages = len(slices)
+    print(f"Image will be split into {total_pages} pages")
 
     # Create PDF
+    print(f"Creating PDF: {output_path}")
     c = canvas.Canvas(output_path, pagesize=page_size)
 
-    for i, (start_y, end_y) in enumerate(slices):
+    for i, (start_y, end_y) in enumerate(slices, 1):
+        print(f"Processing page {i}/{total_pages}...")
+
         # Create temporary image for this slice
         slice_height = end_y - start_y
         slice_img = image.crop((0, start_y, image.size[0], end_y))
@@ -156,8 +170,8 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
         scaled_width = image.size[0] * scale_factor
         scaled_slice_height = slice_height * scale_factor
         c.drawImage(temp_slice_path,
-                   margin_pixels,
-                   page_height - scaled_slice_height - margin_pixels,
+                   margin_points,
+                   page_height - scaled_slice_height - margin_points,
                    width=scaled_width,
                    height=scaled_slice_height)
 
@@ -165,19 +179,20 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
         os.remove(temp_slice_path)
 
         # Add new page if not last slice
-        if i < len(slices) - 1:
+        if i < total_pages:
             c.showPage()
 
     c.save()
+    print("PDF creation complete!")
 
 def main():
     parser = argparse.ArgumentParser(description='Convert tall image to multi-page PDF')
     parser.add_argument('input_file', help='Input image file')
     parser.add_argument('--output', '-o', help='Output PDF file (default: input_name.pdf)')
-    parser.add_argument('--page-size', '-p', choices=PAGE_SIZES.keys(),
+    parser.add_argument('--page-size', '-p', choices=sorted(PAGE_SIZES.keys()),
                        default='a4', help='Page size (default: a4)')
-    parser.add_argument('--margin', '-m', default='20mm',
-                       help='Margin size in px or mm (default: 20mm)')
+    parser.add_argument('--margin', '-m', default='10mm',
+                       help='Margin size in px or mm (default: 10mm)')
     parser.add_argument('--min-gap', '-g', type=int, default=50,
                        help='Minimum gap size in pixels to consider for page breaks (default: 50)')
 
@@ -189,16 +204,18 @@ def main():
         args.output = f'{base_name}.pdf'
 
     # Convert margin to pixels
-    margin_pixels = parse_margin(args.margin)
+    margin_points = parse_margin(args.margin)
 
     try:
+        print(f"Opening image: {args.input_file}")
         # Open and trim image
         with Image.open(args.input_file) as img:
+            print("Trimming whitespace from image edges...")
             trimmed_img = trim_whitespace(img)
 
             # Create PDF
             create_pdf(trimmed_img, args.output, PAGE_SIZES[args.page_size],
-                      margin_pixels, args.min_gap)
+                      margin_points, args.min_gap)
 
         print(f"Successfully created PDF: {args.output}")
 
