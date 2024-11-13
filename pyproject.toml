@@ -1,0 +1,27 @@
+[project]
+name = "scrollshot2pdf"
+version = "0.1.0"
+authors = [
+    {name = "Oliver Steele", email = "steele@osteele.com"},
+]
+description = "Convert tall screenshots into multi-page PDFs"
+dependencies = [
+    "pillow",
+    "reportlab",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["pdf", "screenshot", "scrollshot"]
+
+[project.urls]
+homepage = "https://github.com/osteele/scrollshot2pdf"
+repository = "https://github.com/osteele/scrollshot2pdf.git"
+issues = "https://github.com/osteele/scrollshot2pdf/issues"
+
+[project.scripts]
+scrollshot2pdf = "scrollshot2pdf:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

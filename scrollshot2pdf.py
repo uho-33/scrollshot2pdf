@@ -1,11 +1,3 @@
-#!/usr/bin/env uv run
-# /// script
-# requires-python = ">=3.10"
-# dependencies = [
-#     "pillow",
-#     "reportlab",
-# ]
-# ///
 import argparse
 from PIL import Image, ImageOps
 from reportlab.pdfgen import canvas

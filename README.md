@@ -1,42 +1,38 @@
-# Image to Multi-Page PDF Converter
+# scrollshot2pdf
 
-A command-line tool that converts tall images into multi-page PDFs. It
-intelligently splits the image across pages by detecting content gaps, avoiding
+A command-line to convert tall screenshots and images into multi-page PDFs.
+Intelligently splits the image across pages by detecting content gaps, avoiding
 awkward breaks in the middle of content.
 
-## Features
+## Installation
 
-- Automatically trims whitespace from image borders
-- Intelligently splits pages at content gaps
-- Supports multiple page sizes (A4, A3, A5, Letter)
-- Configurable margins in millimeters or pixels
-- Maintains aspect ratio while scaling to fit page width
-- Adds consistent margins to all pages
+In the terminal, enter one of these:
 
-## Prerequisites
-
-Install uv from [uv.dev](https://docs.astral.sh/uv/getting-started/installation/)
+```bash
+pip install git+https://github.com/osteele/scrollshot2pdf.git
+uv tool install git+https://github.com/osteele/scrollshot2pdf.git
+```
 
 ## Usage
 
 Basic usage:
 ```bash
-./image_to_pdf.py input_image.png
+scrollshot2pdf input_image.png
 ```
 
 With options:
 ```bash
-./image_to_pdf.py input_image.png -o output.pdf --page-size a4 --margin 25mm --min-gap 100
+scrollshot2pdf input_image.png -o output.pdf --page-size a4 --margin 25mm --min-gap 100
 ```
 
 With customized page numbers:
 ```bash
-./image_to_pdf.py input.png --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
+scrollshot2pdf input.png --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
 ```
 
 With page range selection:
 ```bash
-./image_to_pdf.py input.png --page-range 5 --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
+scrollshot2pdf input.png --page-range 5 --page-numbers --number-position top-right --number-size 12 --number-font "Times-Roman" --skip-first false
 ```
 
 ### Command-line Arguments
@@ -67,7 +63,7 @@ Each size is also available in landscape orientation by adding "-landscape" to t
 - letter
 - letter-landscape
 
-Run `./image_to_pdf.py --help` to see the complete list of available page sizes.
+Run `scrollshot2pdf --help` to see the complete list of available page sizes.
 
 ### Margin Format
 Margins can be specified in:
@@ -86,7 +82,7 @@ Margins can be specified in:
 
 Converting a tall screenshot into a 3-page PDF with 25mm margins:
 ```bash
-python image_to_pdf.py screenshot.png --margin 25mm
+scrollshot2pdf screenshot.png --margin 25mm
 ```
 
 ## Dependencies
