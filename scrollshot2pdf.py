@@ -153,10 +153,67 @@ def parse_page_range(range_str: str, total_pages: int) -> Tuple[int, int]:
     except ValueError:
         raise ValueError(f"Invalid page range. Format: N, N-M, N-, -M (1 to {total_pages})")
 
+def calculate_optimal_columns(image_width: float, usable_width: float, image: Image.Image, debug: bool = False) -> int:
+    """
+    Calculate optimal number of columns to minimize scaling while fitting page width.
+    Accounts for DPI differences between image and PDF output.
+    """
+    # Get image DPI from metadata, default to 72 if not specified
+    try:
+        image_dpi = image.info.get('dpi', (72, 72))[0]  # Get horizontal DPI
+    except (AttributeError, TypeError):
+        image_dpi = 72
+
+    output_dpi = 300  # PDF target DPI
+
+    # Convert image width to points at output DPI
+    image_width_at_output_dpi = (image_width * 72) / image_dpi  # Convert to points
+
+    if debug:
+        print(f"\nColumn calculation:")
+        print(f"Image width: {image_width:.1f}px")
+        print(f"Image DPI: {image_dpi}")
+        print(f"Image width at {output_dpi} DPI: {image_width_at_output_dpi:.1f}pt")
+        print(f"Usable page width: {usable_width:.1f}pt")
+
+    # Start with 1 column and increase until we find a solution
+    for columns in range(1, 11):  # Limit to 10 columns max
+        # Calculate column width with gaps
+        total_gap_width = 20.0 * (columns - 1)  # Using default column gap
+        column_width = (usable_width - total_gap_width) / columns
+
+        # Calculate scale factor based on output DPI
+        scale_factor = column_width / image_width_at_output_dpi
+        inverse_scale = 1 / scale_factor
+
+        if debug:
+            print(f"\nTrying {columns} column{'s' if columns > 1 else ''}:")
+            print(f"  Column width: {column_width:.1f}pt")
+            print(f"  Scale factor: {scale_factor:.3f} (1/{inverse_scale:.1f})")
+
+        # If scale factor is >= 1, we can use 1 column
+        if scale_factor >= 1:
+            if debug:
+                print("  ✓ Image fits at original size")
+            return 1
+
+        # If inverse of scale factor is close to an integer, we found our solution
+        if abs(round(inverse_scale) - inverse_scale) < 0.01:
+            if debug:
+                print(f"  ✓ Clean scaling factor found: 1/{round(inverse_scale)}")
+            return columns
+        elif debug:
+            print("  ✗ No clean scaling factor")
+
+    # If no good solution found, default to minimum scaling
+    if debug:
+        print("\nNo optimal solution found, defaulting to 1 column")
+    return 1
+
 def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, float],
                margin_points: float, min_gap_size: int = 50, *,
-               columns: int = 1,
-               column_gap: float = 20.0,  # 20 points default gap
+               columns: int = None,
+               column_gap: float = 20.0,
                add_page_numbers: bool = True,
                number_position: str = 'bottom-left',
                number_font: str = 'Helvetica',
@@ -166,12 +223,18 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
                title_position: str = 'center',
                title_font: str = 'Helvetica-Bold',
                title_size: int = 14,
-               page_range: str = None) -> None:
+               page_range: str = None,
+               debug: bool = False) -> None:
     """Create PDF from image, splitting it into pages and columns."""
     print("Analyzing image dimensions and calculating layout...")
     page_width, page_height = page_size
     usable_width = page_width - 2 * margin_points
     usable_height = page_height - 2 * margin_points
+
+    # Calculate optimal columns if not specified
+    if columns is None:
+        columns = calculate_optimal_columns(image.size[0], usable_width, image, debug)
+        print(f"Automatically selected {columns} column{'s' if columns > 1 else ''}")
 
     # Calculate column width
     total_gap_width = column_gap * (columns - 1)
@@ -339,10 +402,14 @@ def main():
                        help='Page range to output (e.g., 5, 5-10)')
 
     # Add column arguments
-    parser.add_argument('--columns', '-c', type=int, default=1,
-                       help='Number of columns per page (default: 1)')
+    parser.add_argument('--columns', '-c', type=int,
+                       help='Number of columns per page (default: auto-calculated)')
     parser.add_argument('--column-gap', type=float, default=20.0,
                        help='Gap between columns in points (default: 20.0)')
+
+    # Add debug flag
+    parser.add_argument('--debug', action='store_true',
+                       help='Show detailed debug information')
 
     args = parser.parse_args()
 
@@ -383,7 +450,8 @@ def main():
                       title_position=args.title_position,
                       title_font=args.title_font,
                       title_size=args.title_size,
-                      page_range=args.page_range)
+                      page_range=args.page_range,
+                      debug=args.debug)
 
         print(f"Successfully created PDF: {args.output}")
 
