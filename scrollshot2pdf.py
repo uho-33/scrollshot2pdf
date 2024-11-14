@@ -155,6 +155,8 @@ def parse_page_range(range_str: str, total_pages: int) -> Tuple[int, int]:
 
 def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, float],
                margin_points: float, min_gap_size: int = 50, *,
+               columns: int = 1,
+               column_gap: float = 20.0,  # 20 points default gap
                add_page_numbers: bool = True,
                number_position: str = 'bottom-left',
                number_font: str = 'Helvetica',
@@ -165,24 +167,31 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
                title_font: str = 'Helvetica-Bold',
                title_size: int = 14,
                page_range: str = None) -> None:
-    """Create PDF from image, splitting it into pages."""
+    """Create PDF from image, splitting it into pages and columns."""
     print("Analyzing image dimensions and calculating layout...")
     page_width, page_height = page_size
     usable_width = page_width - 2 * margin_points
     usable_height = page_height - 2 * margin_points
 
-    # Calculate scale factor to fit width while preserving aspect ratio
-    scale_factor = usable_width / image.size[0]
+    # Calculate column width
+    total_gap_width = column_gap * (columns - 1)
+    column_width = (usable_width - total_gap_width) / columns
+
+    # Calculate scale factor to fit column width while preserving aspect ratio
+    scale_factor = column_width / image.size[0]
 
     # Find content gaps in original image (no scaling)
     print("Finding content gaps for optimal page breaks...")
     content_gaps = find_content_gaps(image, min_gap_size)
 
     # Calculate slice positions using scaled height
-    scaled_usable_height = int(usable_height / scale_factor)  # Convert page height to original image scale
+    scaled_usable_height = int(usable_height / scale_factor)
     slices = calculate_slices(image.size[1], scaled_usable_height, content_gaps)
-    total_pages = len(slices)
-    print(f"Image will be split into {total_pages} pages")
+
+    # Calculate total pages needed based on columns
+    total_slices = len(slices)
+    total_pages = (total_slices + columns - 1) // columns  # Ceiling division
+    print(f"Image will be split into {total_slices} slices across {total_pages} pages")
 
     # Parse page range
     try:
@@ -192,8 +201,9 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
         sys.exit(1)
 
     # Filter slices based on page range
-    slices = slices[start_page-1:end_page]
-    print(f"Processing pages {start_page} to {end_page} of {total_pages}")
+    start_slice = (start_page - 1) * columns
+    end_slice = min(end_page * columns, total_slices)
+    slices = slices[start_slice:end_slice]
 
     def add_page_number(canvas, page_num):
         if skip_first_number and page_num == 1:
@@ -245,36 +255,45 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
     # Add title to first page only
     add_title(c)
 
-    for i, (start_y, end_y) in enumerate(slices, 1):
-        print(f"Processing page {i}/{total_pages}...")
+    current_page = 1
+    for i in range(0, len(slices), columns):
+        print(f"Processing page {current_page}/{total_pages}...")
 
-        # Create temporary image for this slice
-        slice_height = end_y - start_y
-        slice_img = image.crop((0, start_y, image.size[0], end_y))
+        # Process each column in the current page
+        for col in range(columns):
+            if i + col >= len(slices):
+                break
 
-        # Save temporary slice
-        temp_slice_path = f'temp_slice_{i}.png'
-        slice_img.save(temp_slice_path)
+            start_y, end_y = slices[i + col]
+            slice_height = end_y - start_y
+            slice_img = image.crop((0, start_y, image.size[0], end_y))
 
-        # Add to PDF with margins, scaling both dimensions
-        scaled_width = image.size[0] * scale_factor
-        scaled_slice_height = slice_height * scale_factor
-        c.drawImage(temp_slice_path,
-                   margin_points,
-                   page_height - scaled_slice_height - margin_points,
-                   width=scaled_width,
-                   height=scaled_slice_height)
+            # Save temporary slice
+            temp_slice_path = f'temp_slice_{i+col}.png'
+            slice_img.save(temp_slice_path)
 
-        # Remove temporary file
-        os.remove(temp_slice_path)
+            # Calculate position for this column
+            x_pos = margin_points + (column_width + column_gap) * col
+            scaled_slice_height = slice_height * scale_factor
+
+            # Add to PDF
+            c.drawImage(temp_slice_path,
+                       x_pos,
+                       page_height - scaled_slice_height - margin_points,
+                       width=column_width,
+                       height=scaled_slice_height)
+
+            # Remove temporary file
+            os.remove(temp_slice_path)
 
         # Add page number if enabled
         if add_page_numbers:
-            add_page_number(c, i)
+            add_page_number(c, current_page)
 
-        # Add new page if not last slice
-        if i < total_pages:
+        # Add new page if not last page
+        if i + columns < len(slices):
             c.showPage()
+            current_page += 1
 
     c.save()
     print("PDF creation complete!")
@@ -319,6 +338,12 @@ def main():
     parser.add_argument('--page-range',
                        help='Page range to output (e.g., 5, 5-10)')
 
+    # Add column arguments
+    parser.add_argument('--columns', '-c', type=int, default=1,
+                       help='Number of columns per page (default: 1)')
+    parser.add_argument('--column-gap', type=float, default=20.0,
+                       help='Gap between columns in points (default: 20.0)')
+
     args = parser.parse_args()
 
     # Set output filename if not specified
@@ -347,6 +372,8 @@ def main():
             # Create PDF
             create_pdf(trimmed_img, args.output, PAGE_SIZES[args.page_size.lower()],
                       margin_points, args.min_gap,
+                      columns=args.columns,
+                      column_gap=args.column_gap,
                       add_page_numbers=args.page_numbers,
                       number_position=args.number_position,
                       number_font=args.number_font,

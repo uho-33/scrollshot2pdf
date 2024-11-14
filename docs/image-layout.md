@@ -6,16 +6,19 @@
 Given:
 - Page dimensions $(w_p, h_p)$ in points
 - Margin $m$ in points
+- Number of columns $n$ (default 1)
+- Column gap $g$ (default 20 points)
 
 The effective usable area has dimensions:
-- Width: $w_e = w_p - 2m$
+- Total Width: $w_e = w_p - 2m$
+- Column Width: $w_c = (w_e - g(n-1))/n$
 - Height: $h_e = h_p - 2m$
 
 ### Image Scaling
 For an input image with dimensions $(w_i, h_i)$ pixels:
 
-1. The scale factor $s$ is computed to fit the image width to the effective width:
-   $s = \frac{w_e}{w_i}$
+1. The scale factor $s$ is computed to fit the image width to the column width:
+   $s = \frac{w_c}{w_i}$
 
 2. The scaled image dimensions are:
    - Width: $w_s = w_i \cdot s$
@@ -47,8 +50,9 @@ For each slice with coordinates $(y_0, y_1)$:
 1. Slice height in original coordinates: $h_{slice} = y_1 - y_0$
 
 2. Position on page (in points):
-   - X: $x = m$
-   - Y: $y = h_p - h_{slice} \cdot s - m$
+   - Column index: $c = \text{slice_index} \bmod n$
+   - X: $x = m + c(w_c + g)$
+   - Y: $y = h_p - h_{slice} \cdot s - m - \lfloor\text{slice_index}/n\rfloor \cdot h_e$
 
 3. Dimensions on page (in points):
    - Width: $w_s = w_i \cdot s$
@@ -56,17 +60,18 @@ For each slice with coordinates $(y_0, y_1)$:
 
 ## Example
 
-For an A4 page (595.276 × 841.89 points) with 10mm margins (28.346 points):
+For an A4 page (595.276 × 841.89 points) with 10mm margins (28.346 points) and 2 columns:
 
 1. Effective area: 538.584 × 785.198 points
+   Column width: 259.119 points (with 20pt gap)
 
 2. For a 1000×3000px image:
-   - Scale factor: $s = 538.584/1000 = 0.538584$
-   - Scaled width: 538.584 points
-   - Scaled height: 1615.752 points
+   - Scale factor: $s = 259.119/1000 = 0.259119$
+   - Scaled width: 259.119 points per column
+   - Scaled height: 777.357 points
 
-3. Each slice will be approximately 785.198 points high (scaled), or 1458 pixels in original coordinates, adjusted to nearest content gap
+3. Each slice will be approximately 785.198 points high (scaled), or 3030 pixels in original coordinates, adjusted to nearest content gap
 
 4. Final slice positioning:
-   - Left margin: 28.346 points
+   - Left margins: 28.346 points (col 1), 307.465 points (col 2)
    - Top margin from slice top: 28.346 points
