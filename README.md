@@ -64,6 +64,7 @@ Use scrollshot2pdf as a fallback solution when:
 - Title page support
 - Whitespace trimming
 - Selective page range output
+- Optional OCR text layer for searchable PDFs
 
 ## Installation
 
@@ -142,6 +143,32 @@ scrollshot2pdf input.png \
 ### Other Options
 - `--page-range`: Output specific pages (e.g., "1-5" or "3")
 - `--output`, `-o`: Output PDF file name (default: input_name.pdf)
+
+### OCR Options
+- `--ocr`: Enable OCR text layer (requires tesseract)
+- `--ocr-lang`: OCR language (default: eng)
+- `--no-ocr`: Disable OCR (default)
+
+OCR uses the Tesseract library, and only works on Latin characters.
+
+Additional dependencies for OCR:
+
+```bash
+pip install pytesseract pdf2image
+```
+
+On Ubuntu/Debian:
+
+```bash
+sudo apt-get install tesseract-ocr
+```
+
+On macOS:
+
+```bash
+brew install tesseract
+```
+
 
 ## Examples
 

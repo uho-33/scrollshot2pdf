@@ -4,7 +4,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import pagesizes
 import os
 import sys
-from typing import Tuple, List
+from typing import Tuple, List, Optional
+import pytesseract
 
 # Get all paper sizes from reportlab
 PAGE_SIZES = {name.lower(): getattr(pagesizes, name)
@@ -210,6 +211,68 @@ def calculate_optimal_columns(image_width: float, usable_width: float, image: Im
         print("\nNo optimal solution found, defaulting to 1 column")
     return 1
 
+def add_ocr_layer(image: Image.Image, canvas_obj: canvas.Canvas,
+                  x: float, y: float, width: float, height: float,
+                  lang: str = 'eng+jpn') -> None:
+    """Add searchable text layer using OCR while preserving original image."""
+    # Configure OCR parameters for better mixed-language detection
+    custom_config = r'--oem 3 --psm 3'  # Use LSTM OCR Engine Mode and Auto-page segmentation
+
+    # Get OCR data with bounding boxes
+    data = pytesseract.image_to_data(image, lang=lang,
+                                    config=custom_config,
+                                    output_type=pytesseract.Output.DICT)
+
+    # Save canvas state
+    canvas_obj.saveState()
+
+    # Set text color to transparent
+    canvas_obj.setFillColorRGB(0, 0, 0, 0)
+
+    # Calculate scale factors
+    scale_x = width / image.size[0]
+    scale_y = height / image.size[1]
+
+    # Group text by block_num to maintain text flow
+    blocks = {}
+    for i in range(len(data['text'])):
+        if data['conf'][i] > 0:  # Only process text with confidence
+            block_num = data['block_num'][i]
+            if block_num not in blocks:
+                blocks[block_num] = []
+            blocks[block_num].append(i)
+
+    # Process each block
+    for block_indices in blocks.values():
+        for i in block_indices:
+            text = data['text'][i]
+            if not text.strip():
+                continue
+
+            # Get text dimensions and position
+            left = data['left'][i]
+            top = data['top'][i]
+            width_text = data['width'][i]
+            height_text = data['height'][i]
+
+            # Convert coordinates to PDF space
+            box_x = x + (left * scale_x)
+            # Adjust y position to align with text baseline
+            baseline_offset = height_text * 0.2
+            box_y = y + height - ((top + height_text - baseline_offset) * scale_y)
+
+            # Set font size based on the OCR'd text height
+            font_size = height_text * scale_y
+            canvas_obj.setFont("Helvetica", font_size)
+
+            # Add invisible text
+            canvas_obj.drawString(box_x, box_y, text)
+
+    # Restore state
+    canvas_obj.restoreState()
+
+    # Note: We don't draw the image here anymore, as it's handled by the calling function
+
 def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, float],
                margin_points: float, min_gap_size: int = 50, *,
                columns: int = None,
@@ -224,8 +287,20 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
                title_font: str = 'Helvetica-Bold',
                title_size: int = 14,
                page_range: str = None,
+               enable_ocr: bool = False,
+               ocr_lang: str = 'eng',
                debug: bool = False) -> None:
-    """Create PDF from image, splitting it into pages and columns."""
+    """Create PDF from image with optional OCR layer."""
+
+    if enable_ocr:
+        try:
+            pytesseract.get_tesseract_version()
+        except pytesseract.TesseractNotFoundError:
+            print("Error: Tesseract is not installed. Please install tesseract-ocr first:", file=sys.stderr)
+            print("Ubuntu/Debian: sudo apt-get install tesseract-ocr", file=sys.stderr)
+            print("macOS: brew install tesseract", file=sys.stderr)
+            sys.exit(1)
+
     print("Analyzing image dimensions and calculating layout...")
     page_width, page_height = page_size
     usable_width = page_width - 2 * margin_points
@@ -339,7 +414,16 @@ def create_pdf(image: Image.Image, output_path: str, page_size: Tuple[float, flo
             x_pos = margin_points + (column_width + column_gap) * col
             scaled_slice_height = slice_height * scale_factor
 
-            # Add to PDF
+            if enable_ocr:
+                # Add OCR layer before drawing image
+                add_ocr_layer(slice_img, c,
+                            x_pos,
+                            page_height - scaled_slice_height - margin_points,
+                            column_width,
+                            scaled_slice_height,
+                            lang=ocr_lang)
+
+            # Draw the image (OCR layer will be underneath)
             c.drawImage(temp_slice_path,
                        x_pos,
                        page_height - scaled_slice_height - margin_points,
@@ -411,6 +495,14 @@ def main():
     parser.add_argument('--debug', action='store_true',
                        help='Show detailed debug information')
 
+    # Add OCR arguments
+    parser.add_argument('--ocr', action='store_true',
+                       help='Enable OCR text layer (requires tesseract)')
+    parser.add_argument('--ocr-lang', default='eng',
+                       help='OCR language (default: eng)')
+    parser.add_argument('--no-ocr', action='store_false', dest='ocr',
+                       help='Disable OCR (default)')
+
     args = parser.parse_args()
 
     # Set output filename if not specified
@@ -451,6 +543,8 @@ def main():
                       title_font=args.title_font,
                       title_size=args.title_size,
                       page_range=args.page_range,
+                      enable_ocr=args.ocr,
+                      ocr_lang=args.ocr_lang,
                       debug=args.debug)
 
         print(f"Successfully created PDF: {args.output}")
