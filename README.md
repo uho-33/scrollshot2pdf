@@ -4,6 +4,57 @@ A command-line to convert tall screenshots and images into multi-page PDFs.
 Intelligently splits the image across pages by detecting content gaps, avoiding
 awkward breaks in the middle of content.
 
+## What is a Scrollshot?
+
+A scrollshot (also called a scrolling screenshot or full-page screenshot) captures an entire scrollable area - like a long webpage, chat conversation, or social media feed - into a single tall image. While normal screenshots only capture what's visible on screen, scrollshots stitch together multiple screens worth of content.
+
+### Common Uses
+
+- Capturing entire web articles or documentation
+- Preserving full chat/message histories
+- Recording social media threads or discussions
+- Documenting long forms or user interfaces
+- Archiving entire product pages or listings
+
+### Creating Scrollshots
+
+Third-party capture apps record a scrolling screen element into a tall image.
+Third-party stitching apps combine a series of overlapped screenshots, or a
+video capture of the screen, into a single scrollshot. These are my favorites:
+
+**Capture Apps:**
+- CleanShot X (macOS)
+
+**Stitching Apps:***
+- PicSew (iOS)
+- Tailor (iOS)
+
+### When to Use scrollshot2pdf
+
+This tool is particularly useful when you need to:
+- Convert long scrollshots into a printable format
+- Break up tall images into properly paginated documents
+- Create multi-column layouts from single-column content
+- Add page numbers and titles to scrollshot content
+- Share scrollshots in a standardized document format
+- Archive long-form content in a print-friendly way
+
+### When Not to Use scrollshot2pdf
+
+Consider using direct PDF export when available. A natively-generated PDF is usually superior to a converted scrollshot because it:
+
+- Preserves searchable and copyable text (vs. image-only content requiring OCR)
+- Maintains proper document structure and accessibility
+- Includes proper pagination, headers, and footers
+- Preserves the original design intent and formatting
+- Often produces smaller file sizes
+
+Use scrollshot2pdf as a fallback solution when:
+- The app/site doesn't offer PDF export
+- The PDF export is missing visible content
+- The print/export layout differs significantly from the screen view
+- You need to preserve exact visual fidelity of what you see on screen
+
 ## Features
 
 - Intelligent page breaks at natural content gaps
