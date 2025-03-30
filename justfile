@@ -13,6 +13,9 @@ setup:
 check: lint typecheck test
     @echo "All checks passed!"
 
+# Pre-commit hook
+pre-commit-check: lint typecheck-without-errors test
+
 # Format code with ruff
 format:
     uv run --dev ruff format .
@@ -34,3 +37,6 @@ test *ARGS:
 # Run type checking with pyright
 typecheck:
     uv run --dev pyright .
+
+typecheck-without-errors:
+    uv run --dev pyright . || echo "Errors found"

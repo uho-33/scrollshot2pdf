@@ -154,12 +154,21 @@ scrollshot2pdf input.png \
 - `--ocr-lang`: OCR language (default: eng)
 - `--no-ocr`: Disable OCR (default)
 
-OCR uses the Tesseract library, and only works on Latin characters.
+The OCR feature makes your PDFs searchable by adding an invisible text layer over the image. This is the only feature that requires the Tesseract library. Without OCR, the PDFs will still be created, but text won't be searchable.
 
-Additional dependencies for OCR:
+OCR uses the Tesseract library and supports multiple languages including non-Latin scripts when appropriate language packs are installed.
+
+To use OCR features, install with OCR support:
 
 ```bash
-pip install pytesseract pdf2image
+# Install with OCR support using pip
+pip install "git+https://github.com/osteele/scrollshot2pdf.git[ocr]"
+
+# Or with uv tool
+uv tool install --with ocr git+https://github.com/osteele/scrollshot2pdf.git
+
+# Or add OCR dependency separately
+pip install pytesseract
 ```
 
 On Ubuntu/Debian:

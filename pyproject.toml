@@ -14,6 +14,11 @@ readme = "README.md"
 license = {text = "MIT"}
 keywords = ["pdf", "screenshot", "scrollshot"]
 
+[project.optional-dependencies]
+ocr = [
+    "pytesseract",
+]
+
 [project.urls]
 homepage = "https://github.com/osteele/scrollshot2pdf"
 repository = "https://github.com/osteele/scrollshot2pdf.git"

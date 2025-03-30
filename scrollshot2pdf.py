@@ -1,11 +1,19 @@
 import argparse
-from PIL import Image, ImageOps
-from reportlab.pdfgen import canvas
-from reportlab.lib import pagesizes
 import os
 import sys
-from typing import Tuple, List, Optional
-import pytesseract
+from typing import List, Tuple
+
+from PIL import Image
+from reportlab.lib import pagesizes
+from reportlab.pdfgen import canvas
+
+# Try to import pytesseract but make it optional
+try:
+    import pytesseract
+
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
 
 # Get all paper sizes from reportlab
 PAGE_SIZES = {
@@ -342,19 +350,29 @@ def create_pdf(
         sys.exit(1)
 
     # Check if tesseract executable is available when OCR is enabled
+    if enable_ocr and not TESSERACT_AVAILABLE:
+        print(
+            "Error: OCR was requested but pytesseract is not installed.",
+            file=sys.stderr,
+        )
+        print("To use OCR, install scrollshot2pdf with OCR support:", file=sys.stderr)
+        print(
+            '  pip install "git+https://github.com/osteele/scrollshot2pdf.git[ocr]"',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Check if tesseract executable is available when OCR is enabled
     if enable_ocr:
         try:
             pytesseract.get_tesseract_version()
         except pytesseract.TesseractNotFoundError:
             print(
-                "Error: Tesseract executable is not installed or not in PATH.",
+                "Error: Tesseract is not installed. Please install tesseract-ocr first:",
                 file=sys.stderr,
             )
-            print("Please install tesseract-ocr first:", file=sys.stderr)
-            print(
-                "  Ubuntu/Debian: sudo apt-get install tesseract-ocr", file=sys.stderr
-            )
-            print("  macOS: brew install tesseract", file=sys.stderr)
+            print("Ubuntu/Debian: sudo apt-get install tesseract-ocr", file=sys.stderr)
+            print("macOS: brew install tesseract", file=sys.stderr)
             sys.exit(1)
 
     print("Analyzing image dimensions and calculating layout...")

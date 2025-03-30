@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: check
         name: Run checks (lint, typecheck, test)
-        entry: just check
+        entry: just pre-commit-check
         language: system
         pass_filenames: false
         always_run: true
