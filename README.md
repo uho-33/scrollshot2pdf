@@ -71,7 +71,12 @@ Use scrollshot2pdf as a fallback solution when:
 In the terminal, enter one of these:
 
 ```bash
+# Install using pip
 pip install git+https://github.com/osteele/scrollshot2pdf.git
+```
+
+```bash
+# Install using uv
 uv tool install git+https://github.com/osteele/scrollshot2pdf.git
 ```
 
@@ -190,6 +195,7 @@ Each size is also available in landscape orientation by adding "-landscape" to t
 Run `scrollshot2pdf --help` to see the complete list of available page sizes.
 
 ### Margin Format
+
 Margins can be specified in:
 - Millimeters: e.g., "20mm"
 - Pixels: e.g., "50px" or just "50"

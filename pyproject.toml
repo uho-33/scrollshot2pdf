@@ -22,6 +22,9 @@ issues = "https://github.com/osteele/scrollshot2pdf/issues"
 [project.scripts]
 scrollshot2pdf = "scrollshot2pdf:main"
 
+[dependency-groups]
+dev = ["pre-commit", "ruff", "pyright", "pytest"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
