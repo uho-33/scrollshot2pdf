@@ -18,6 +18,12 @@ keywords = ["pdf", "screenshot", "scrollshot"]
 ocr = [
     "pytesseract",
 ]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "pyright",
+]
 
 [project.urls]
 homepage = "https://github.com/osteele/scrollshot2pdf"
@@ -33,6 +39,10 @@ dev = ["pre-commit", "ruff", "pyright", "pytest"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
 
 [tool.ruff]
 line-length = 120
