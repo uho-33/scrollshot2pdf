@@ -1,7 +1,6 @@
 import argparse
 import os
 import sys
-from typing import List, Tuple
 
 from PIL import Image
 from reportlab.lib import pagesizes
@@ -23,12 +22,7 @@ PAGE_SIZES = {
 }
 
 # Add landscape variants
-PAGE_SIZES.update(
-    {
-        f"{name}-landscape": (height, width)
-        for name, (width, height) in PAGE_SIZES.items()
-    }
-)
+PAGE_SIZES.update({f"{name}-landscape": (height, width) for name, (width, height) in PAGE_SIZES.items()})
 
 
 def mm_to_pixels(mm: float, dpi: int = 72) -> int:
@@ -50,8 +44,8 @@ def parse_margin(margin_str: str) -> float:
     else:
         try:
             return float(margin_str) * 72 / 96  # Treat bare numbers as pixels
-        except ValueError:
-            raise ValueError("Margin must be specified in px, mm, or as plain pixels")
+        except ValueError as err:
+            raise ValueError("Margin must be specified in px, mm, or as plain pixels") from err
 
 
 def trim_whitespace(image: Image.Image) -> Image.Image:
@@ -71,7 +65,7 @@ def trim_whitespace(image: Image.Image) -> Image.Image:
     return image
 
 
-def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> List[int]:
+def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> list[int]:
     """
     Find vertical positions where there are gaps in content.
     Returns a list of y-coordinates where gaps occur.
@@ -106,9 +100,7 @@ def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> List[int]:
     return gaps
 
 
-def calculate_slices(
-    image_height: int, page_height: int, content_gaps: List[int]
-) -> List[Tuple[int, int]]:
+def calculate_slices(image_height: int, page_height: int, content_gaps: list[int]) -> list[tuple[int, int]]:
     """
     Calculate optimal slice positions based on page height and content gaps.
     Returns list of (start_y, end_y) tuples.
@@ -127,9 +119,7 @@ def calculate_slices(
 
         # Find nearest content gap
         nearest_gap = None
-        min_distance = (
-            page_height // 4
-        )  # Don't look for gaps too far from ideal position
+        min_distance = page_height // 4  # Don't look for gaps too far from ideal position
 
         for gap in content_gaps:
             if gap > current_pos and gap < ideal_next_pos:
@@ -156,7 +146,7 @@ def title_from_filename(filename: str) -> str:
     return base.replace("_", " ").replace("-", " ")
 
 
-def parse_page_range(range_str: str, total_pages: int) -> Tuple[int, int]:
+def parse_page_range(range_str: str, total_pages: int) -> tuple[int, int]:
     """Parse page range string into start and end page numbers (1-based)."""
     if not range_str:
         return 1, total_pages
@@ -175,15 +165,11 @@ def parse_page_range(range_str: str, total_pages: int) -> Tuple[int, int]:
 
         return start, end
 
-    except ValueError:
-        raise ValueError(
-            f"Invalid page range. Format: N, N-M, N-, -M (1 to {total_pages})"
-        )
+    except ValueError as err:
+        raise ValueError(f"Invalid page range. Format: N, N-M, N-, -M (1 to {total_pages})") from err
 
 
-def calculate_optimal_columns(
-    image_width: float, usable_width: float, image: Image.Image, debug: bool = False
-) -> int:
+def calculate_optimal_columns(image_width: float, usable_width: float, image: Image.Image, debug: bool = False) -> int:
     """
     Calculate optimal number of columns to minimize scaling while fitting page width.
     Accounts for DPI differences between image and PDF output.
@@ -252,14 +238,10 @@ def add_ocr_layer(
 ) -> None:
     """Add searchable text layer using OCR while preserving original image."""
     # Configure OCR parameters for better mixed-language detection
-    custom_config = (
-        r"--oem 3 --psm 3"  # Use LSTM OCR Engine Mode and Auto-page segmentation
-    )
+    custom_config = r"--oem 3 --psm 3"  # Use LSTM OCR Engine Mode and Auto-page segmentation
 
     # Get OCR data with bounding boxes
-    data = pytesseract.image_to_data(
-        image, lang=lang, config=custom_config, output_type=pytesseract.Output.DICT
-    )
+    data = pytesseract.image_to_data(image, lang=lang, config=custom_config, output_type=pytesseract.Output.DICT)
 
     # Save canvas state
     canvas_obj.saveState()
@@ -315,7 +297,7 @@ def add_ocr_layer(
 def create_pdf(
     image: Image.Image,
     output_path: str,
-    page_size: Tuple[float, float],
+    page_size: tuple[float, float],
     margin_points: float,
     min_gap_size: int = 50,
     *,
@@ -410,7 +392,7 @@ def create_pdf(
         try:
             start_page, end_page = parse_page_range(page_range, total_pages)
         except ValueError as e:
-            print(f"Error: {str(e)}", file=sys.stderr)
+            print(f"Error: {e!s}", file=sys.stderr)
             sys.exit(1)
 
         # Filter slices based on page range
@@ -529,9 +511,7 @@ def create_pdf(
 def main():
     parser = argparse.ArgumentParser(description="Convert tall image to multi-page PDF")
     parser.add_argument("input_file", help="Input image file")
-    parser.add_argument(
-        "--output", "-o", help="Output PDF file (default: input_name.pdf)"
-    )
+    parser.add_argument("--output", "-o", help="Output PDF file (default: input_name.pdf)")
     parser.add_argument(
         "--page-size",
         "-p",
@@ -539,9 +519,7 @@ def main():
         default="a4",
         help="Page size (default: a4)",
     )
-    parser.add_argument(
-        "--margin", "-m", default="10mm", help="Margin size in px or mm (default: 10mm)"
-    )
+    parser.add_argument("--margin", "-m", default="10mm", help="Margin size in px or mm (default: 10mm)")
     parser.add_argument(
         "--min-gap",
         "-g",
@@ -569,9 +547,7 @@ def main():
         default="bottom-left",
         help="Position of page numbers",
     )
-    parser.add_argument(
-        "--number-font", default="Helvetica", help="Font for page numbers"
-    )
+    parser.add_argument("--number-font", default="Helvetica", help="Font for page numbers")
     parser.add_argument(
         "--number-size",
         type=int,
@@ -597,9 +573,7 @@ def main():
         help="Position of title",
     )
     parser.add_argument("--title-font", default="Helvetica-Bold", help="Font for title")
-    parser.add_argument(
-        "--title-size", type=int, default=14, help="Font size for title in points"
-    )
+    parser.add_argument("--title-size", type=int, default=14, help="Font size for title in points")
 
     # Add page range option
     parser.add_argument("--page-range", help="Page range to output (e.g., 5, 5-10)")
@@ -619,18 +593,12 @@ def main():
     )
 
     # Add debug flag
-    parser.add_argument(
-        "--debug", action="store_true", help="Show detailed debug information"
-    )
+    parser.add_argument("--debug", action="store_true", help="Show detailed debug information")
 
     # Add OCR arguments
-    parser.add_argument(
-        "--ocr", action="store_true", help="Enable OCR text layer (requires tesseract)"
-    )
+    parser.add_argument("--ocr", action="store_true", help="Enable OCR text layer (requires tesseract)")
     parser.add_argument("--ocr-lang", default="eng", help="OCR language (default: eng)")
-    parser.add_argument(
-        "--no-ocr", action="store_false", dest="ocr", help="Disable OCR (default)"
-    )
+    parser.add_argument("--no-ocr", action="store_false", dest="ocr", help="Disable OCR (default)")
 
     args = parser.parse_args()
 
@@ -645,10 +613,7 @@ def main():
     # Process title if specified
     title: str | None = None
     if args.title:
-        if args.title == "from-filename":
-            title = title_from_filename(args.input_file)
-        else:
-            title = args.title
+        title = title_from_filename(args.input_file) if args.title == "from-filename" else args.title
 
     try:
         print(f"Opening image: {args.input_file}")
@@ -684,7 +649,7 @@ def main():
         print(f"Successfully created PDF: {args.output}")
 
     except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        print(f"Error: {e!s}", file=sys.stderr)
         sys.exit(1)
 
 

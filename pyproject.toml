@@ -33,3 +33,22 @@ dev = ["pre-commit", "ruff", "pyright", "pytest"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+lint.select = [
+    "E",     # PEP 8 coding style violations
+    "F",     # Pyflakes issues
+    "A",     # Built-in names used as variables
+    "B",     # Bugbear bugs and design problems
+    "I",     # isort
+    "N",     # PEP 8 Naming conventions
+    "W",     # Stylistic issues that may lead to bugs
+    "C4",    # Encourage comprehensions
+    "UP",    # Pyupgrade code syntax modernization
+    "SIM",   # Simplifications
+    "TID",   # Tidy import structure
+    "TCH",   # Type hints and type-checking
+    "RUF",   # Ruff-specific rules
+]
