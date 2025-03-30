@@ -1,6 +1,6 @@
 [project]
 name = "scrollshot2pdf"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     {name = "Oliver Steele", email = "steele@osteele.com"},
 ]
