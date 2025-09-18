@@ -130,6 +130,8 @@ scrollshot2pdf input.png \
 - `--columns`, `-c`: Number of columns per page (default: 1)
 - `--column-gap`: Gap between columns in points (default: 20.0)
 - `--min-gap`, `-g`: Minimum gap size in pixels for page breaks (default: 50)
+- `--blank-ratio`, `-b`: Ratio of non-blank to blank pixels allowed in blank lines (default: 0.0)
+- `--no-split-content`: Prevents content blocks from being split across pages. Will error if a block is too tall for one page.
 
 ### Page Numbers
 - `--page-numbers`: Add page numbers (default: enabled)
@@ -213,15 +215,54 @@ Margins can be specified in:
 
 1. The script first trims any whitespace borders from the input image
 2. It scales the image to fit the page width while maintaining aspect ratio
-3. It analyzes the image to find vertical gaps in content
+3. It analyzes the image to find vertical gaps in content using configurable blank line detection
 4. It calculates optimal slice positions based on page height and content gaps
 5. Finally, it creates a PDF with one slice per page, adding specified margins
 
-## Example
+### Blank Line Detection
+
+The tool detects content gaps by analyzing each horizontal row of pixels. By default, a row is considered "blank" only if all pixels are nearly white (> 250 on a 0-255 scale). This strict detection can be relaxed using the `--blank-ratio` option:
+
+- `--blank-ratio 0.0` (default): Strict mode - all pixels must be nearly white
+- `--blank-ratio 0.1`: Allow up to 10% of pixels to be non-blank and still consider the row "blank"
+- `--blank-ratio 0.2`: Allow up to 20% of pixels to be non-blank, and so on
+
+This is particularly useful for images with:
+- Slightly noisy or imperfect blank areas
+- Compression artifacts in white space
+- Subtle background patterns or textures
+
+### Content Splitting Control
+
+The tool's main goal is to slice the image at ideal page breaks. By default, it prioritizes splitting at natural content gaps to avoid awkward breaks. The `--no-split-content` flag changes the fallback behavior when a content block is too long to fit on one page.
+
+- **Default Behavior:** The tool first looks for a content gap within the page's height. If no gap is found, it will split the content directly at the page boundary, which can cut through text or images.
+- **With `--no-split-content`:** The tool also looks for a content gap within the page's height. However, if no gap is found, it will **not** split the content. Instead, it extends the slice downwards until it finds the next available gap.
+
+This is useful for ensuring that logical blocks of content (like paragraphs, code blocks, or images) are never cut in half.
+
+**Important**: Because this can create slices taller than the specified page, the tool will exit with an error if a resulting slice cannot fit on the page. To resolve this, you can:
+
+1.  Remove the `--no-split-content` flag to allow content splitting.
+2.  Use a larger page size (e.g., `--page-size legal` or `--page-size a3-landscape`).
+3.  Use a smaller `--min-gap` value to help the tool detect more potential split points in your image.
+4. If your image's blank areas have noise, try `--blank-ratio` to allow for imperfectly blank lines.
+
+## Examples
 
 Converting a tall screenshot into a 3-page PDF with 25mm margins:
 ```bash
 scrollshot2pdf screenshot.png --margin 25mm
+```
+
+Handling images with noisy blank areas by allowing 15% non-blank pixels in "blank" lines:
+```bash
+scrollshot2pdf noisy_image.png --blank-ratio 0.15
+```
+
+Preventing content from being split across pages (may require a larger page size):
+```bash
+scrollshot2pdf long_content.png --no-split-content --page-size legal
 ```
 
 ## Dependencies

@@ -510,6 +510,10 @@ def create_pdf(
                     "  3. If your image has small whitespace breaks, try a smaller --min-gap value to detect them as split points.",
                     file=sys.stderr,
                 )
+                print(
+                    "  4. If your image's blank areas have noise, try --blank-ratio to allow for imperfectly blank lines.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
             slice_img = image.crop((0, start_y, image.size[0], end_y))
@@ -588,7 +592,7 @@ def main():
     parser.add_argument(
         "--no-split-content",
         action="store_true",
-        help="Never split content blocks; creates longer pages if necessary.",
+        help="Prevents content blocks from being split. Will error if a block is too tall to fit on a single page.",
     )
 
     # Add page numbering arguments

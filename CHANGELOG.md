@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.2]
 
+### Added
+- Added `--no-split-content` flag to prevent content blocks from being split across pages
+- Added `--blank-ratio` argument to control strictness of blank line detection
 
 
 ## [0.1.1]
