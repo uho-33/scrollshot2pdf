@@ -100,7 +100,9 @@ def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> list[int]:
     return gaps
 
 
-def calculate_slices(image_height: int, page_height: int, content_gaps: list[int]) -> list[tuple[int, int]]:
+def calculate_slices(
+    image_height: int, page_height: int, content_gaps: list[int], no_split_content: bool = False
+) -> list[tuple[int, int]]:
     """
     Calculate optimal slice positions based on page height and content gaps.
     Returns list of (start_y, end_y) tuples.
@@ -117,19 +119,30 @@ def calculate_slices(image_height: int, page_height: int, content_gaps: list[int
             slices.append((current_pos, image_height))
             break
 
-        # Find nearest content gap
-        nearest_gap = None
-        min_distance = page_height // 4  # Don't look for gaps too far from ideal position
-
+        # Find the last content gap before the ideal split point.
+        best_gap = None
         for gap in content_gaps:
-            if gap > current_pos and gap < ideal_next_pos:
-                distance = abs(gap - ideal_next_pos)
-                if distance < min_distance:
-                    nearest_gap = gap
-                    min_distance = distance
+            if current_pos < gap < ideal_next_pos:
+                best_gap = gap
 
-        # Use gap position if found, otherwise use ideal position
-        next_pos = nearest_gap if nearest_gap is not None else ideal_next_pos
+        next_pos = ideal_next_pos
+        if best_gap is not None:
+            # If a gap was found within the page, use it to avoid splitting content.
+            next_pos = best_gap
+        elif no_split_content:
+            # If in strict no-split mode and no gap was found, find the very next
+            # available gap in the image, even if it makes a very long page.
+            next_available_gap = None
+            for gap in content_gaps:
+                if gap > current_pos:
+                    next_available_gap = gap
+                    break
+            if next_available_gap is not None:
+                next_pos = next_available_gap
+            else:
+                # No more gaps in the entire image, so this slice must go to the end.
+                next_pos = image_height
+
         slices.append((current_pos, next_pos))
         current_pos = next_pos
 
@@ -316,6 +329,7 @@ def create_pdf(
     enable_ocr: bool = False,
     ocr_lang: str = "eng",
     debug: bool = False,
+    no_split_content: bool = False,
 ) -> None:
     """Create PDF from image with optional OCR layer."""
 
@@ -380,7 +394,7 @@ def create_pdf(
 
     # Calculate slice positions using scaled height
     scaled_usable_height = int(usable_height / scale_factor)
-    slices = calculate_slices(image.size[1], scaled_usable_height, content_gaps)
+    slices = calculate_slices(image.size[1], scaled_usable_height, content_gaps, no_split_content)
 
     # Calculate total pages needed based on columns
     total_slices = len(slices)
@@ -461,6 +475,29 @@ def create_pdf(
 
             start_y, end_y = slices[i + col]
             slice_height = end_y - start_y
+            scaled_slice_height = slice_height * scale_factor
+
+            # Safety check for --no-split-content mode
+            if no_split_content and scaled_slice_height > usable_height:
+                print(
+                    "Error: A content block is too tall to fit on a single page, and --no-split-content is enabled.",
+                    file=sys.stderr,
+                )
+                print("To resolve this, you can:", file=sys.stderr)
+                print(
+                    "  1. Remove the --no-split-content flag to allow the content to be split across pages.",
+                    file=sys.stderr,
+                )
+                print(
+                    "  2. Increase the page height by selecting a larger --page-size (e.g., 'legal' or 'a3-landscape').",
+                    file=sys.stderr,
+                )
+                print(
+                    "  3. If your image has small whitespace breaks, try a smaller --min-gap value to detect them as split points.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
             slice_img = image.crop((0, start_y, image.size[0], end_y))
 
             # Save temporary slice
@@ -526,6 +563,11 @@ def main():
         type=int,
         default=50,
         help="Minimum gap size in pixels to consider for page breaks (default: 50)",
+    )
+    parser.add_argument(
+        "--no-split-content",
+        action="store_true",
+        help="Never split content blocks; creates longer pages if necessary.",
     )
 
     # Add page numbering arguments
@@ -644,6 +686,7 @@ def main():
                 enable_ocr=args.ocr,
                 ocr_lang=args.ocr_lang,
                 debug=args.debug,
+                no_split_content=args.no_split_content,
             )
 
         print(f"Successfully created PDF: {args.output}")
