@@ -65,10 +65,16 @@ def trim_whitespace(image: Image.Image) -> Image.Image:
     return image
 
 
-def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> list[int]:
+def find_content_gaps(image: Image.Image, min_gap_size: int = 50, blank_ratio: float = 0.0) -> list[int]:
     """
     Find vertical positions where there are gaps in content.
     Returns a list of y-coordinates where gaps occur.
+    
+    Args:
+        image: Image to analyze
+        min_gap_size: Minimum gap size in pixels to consider for page breaks
+        blank_ratio: Ratio of non-blank to blank pixels allowed in blank lines 
+                    (0.0=strict, 0.1=10% non-blank allowed)
     """
     # Convert to grayscale for analysis
     gray = image.convert("L")
@@ -86,8 +92,15 @@ def find_content_gaps(image: Image.Image, min_gap_size: int = 50) -> list[int]:
         row_end = row_start + width
         row = pixels[row_start:row_end]
 
-        # Check if row is empty (all white or nearly white pixels)
-        is_empty = all(p > 250 for p in row)
+        # Check if row is empty based on blank_ratio
+        if blank_ratio == 0.0:
+            # Strict mode: all pixels must be > 250 (nearly white)
+            is_empty = all(p > 250 for p in row)
+        else:
+            # Ratio mode: allow some non-blank pixels
+            non_blank_pixels = sum(1 for p in row if p <= 250)
+            non_blank_ratio = non_blank_pixels / len(row)
+            is_empty = non_blank_ratio <= blank_ratio
 
         if is_empty and current_gap_start is None:
             current_gap_start = y
@@ -314,6 +327,7 @@ def create_pdf(
     margin_points: float,
     min_gap_size: int = 50,
     *,
+    blank_ratio: float = 0.0,
     columns: int | None = None,
     column_gap: float = 20.0,
     add_page_numbers: bool = True,
@@ -390,7 +404,7 @@ def create_pdf(
 
     # Find content gaps in original image (no scaling)
     print("Finding content gaps for optimal page breaks...")
-    content_gaps = find_content_gaps(image, min_gap_size)
+    content_gaps = find_content_gaps(image, min_gap_size, blank_ratio)
 
     # Calculate slice positions using scaled height
     scaled_usable_height = int(usable_height / scale_factor)
@@ -565,6 +579,13 @@ def main():
         help="Minimum gap size in pixels to consider for page breaks (default: 50)",
     )
     parser.add_argument(
+        "--blank-ratio",
+        "-b",
+        type=float,
+        default=0.0,
+        help="Ratio of non-blank to blank pixels allowed in blank lines (0.0=strict, 0.1=10%% non-blank allowed, default: 0.0)",
+    )
+    parser.add_argument(
         "--no-split-content",
         action="store_true",
         help="Never split content blocks; creates longer pages if necessary.",
@@ -671,6 +692,7 @@ def main():
                 PAGE_SIZES[args.page_size.lower()],
                 margin_points,
                 args.min_gap,
+                blank_ratio=args.blank_ratio,
                 columns=args.columns,
                 column_gap=args.column_gap,
                 add_page_numbers=args.page_numbers,
