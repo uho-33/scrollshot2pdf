@@ -73,7 +73,7 @@ def find_content_gaps(image: Image.Image, min_gap_size: int = 50, blank_ratio: f
     Args:
         image: Image to analyze
         min_gap_size: Minimum gap size in pixels to consider for page breaks
-        blank_ratio: Ratio of non-blank to blank pixels allowed in blank lines 
+        blank_ratio: Ratio of non-blank to total pixels allowed in blank lines 
                     (0.0=strict, 0.1=10% non-blank allowed)
     """
     # Convert to grayscale for analysis
@@ -138,23 +138,41 @@ def calculate_slices(
             if current_pos < gap < ideal_next_pos:
                 best_gap = gap
 
-        next_pos = ideal_next_pos
-        if best_gap is not None:
-            # If a gap was found within the page, use it to avoid splitting content.
-            next_pos = best_gap
-        elif no_split_content:
-            # If in strict no-split mode and no gap was found, find the very next
-            # available gap in the image, even if it makes a very long page.
-            next_available_gap = None
-            for gap in content_gaps:
-                if gap > current_pos:
-                    next_available_gap = gap
-                    break
-            if next_available_gap is not None:
-                next_pos = next_available_gap
+        min_distance = page_height // 4  # Don't look for gaps too far from ideal position when split in content is allowed.
+        if not no_split_content:
+            if best_gap is None:
+                best_gap = ideal_next_pos
             else:
-                # No more gaps in the entire image, so this slice must go to the end.
-                next_pos = image_height
+                distance = abs(best_gap - ideal_next_pos)
+                if distance > min_distance:
+                    best_gap = ideal_next_pos
+        
+        if best_gap is None: # No gap found between current and ideal position, and split in content is not allowed.
+            print(
+                "Error: A content block is too tall to fit on a single page, and --no-split-content is enabled.",
+                file=sys.stderr,
+            )
+            print("To resolve this, you can:", file=sys.stderr)
+            print(
+                "  1. Remove the --no-split-content flag to allow the content to be split across pages.",
+                file=sys.stderr,
+            )
+            print(
+                "  2. Increase the page height by selecting a larger --page-size (e.g., 'legal' or 'a3-landscape').",
+                file=sys.stderr,
+            )
+            print(
+                "  3. If your image has small whitespace breaks, try a smaller --min-gap value to detect them as split points.",
+                file=sys.stderr,
+            )
+            print(
+                "  4. If your image's blank areas have noise, try --blank-ratio to allow for imperfectly blank lines.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+                
+        next_pos = best_gap
 
         slices.append((current_pos, next_pos))
         current_pos = next_pos
@@ -298,7 +316,6 @@ def add_ocr_layer(
             # Get text dimensions and position
             left = data["left"][i]
             top = data["top"][i]
-            data["width"][i]
             height_text = data["height"][i]
 
             # Convert coordinates to PDF space
@@ -346,18 +363,6 @@ def create_pdf(
     no_split_content: bool = False,
 ) -> None:
     """Create PDF from image with optional OCR layer."""
-
-    if enable_ocr and not TESSERACT_AVAILABLE:
-        print(
-            "Error: OCR was requested but pytesseract is not installed.",
-            file=sys.stderr,
-        )
-        print("To use OCR, install scrollshot2pdf with OCR support:", file=sys.stderr)
-        print(
-            '  pip install "git+https://github.com/osteele/scrollshot2pdf.git[ocr]"',
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
     # Check if tesseract executable is available when OCR is enabled
     if enable_ocr and not TESSERACT_AVAILABLE:
@@ -491,31 +496,6 @@ def create_pdf(
             slice_height = end_y - start_y
             scaled_slice_height = slice_height * scale_factor
 
-            # Safety check for --no-split-content mode
-            if no_split_content and scaled_slice_height > usable_height:
-                print(
-                    "Error: A content block is too tall to fit on a single page, and --no-split-content is enabled.",
-                    file=sys.stderr,
-                )
-                print("To resolve this, you can:", file=sys.stderr)
-                print(
-                    "  1. Remove the --no-split-content flag to allow the content to be split across pages.",
-                    file=sys.stderr,
-                )
-                print(
-                    "  2. Increase the page height by selecting a larger --page-size (e.g., 'legal' or 'a3-landscape').",
-                    file=sys.stderr,
-                )
-                print(
-                    "  3. If your image has small whitespace breaks, try a smaller --min-gap value to detect them as split points.",
-                    file=sys.stderr,
-                )
-                print(
-                    "  4. If your image's blank areas have noise, try --blank-ratio to allow for imperfectly blank lines.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
             slice_img = image.crop((0, start_y, image.size[0], end_y))
 
             # Save temporary slice
@@ -524,7 +504,6 @@ def create_pdf(
 
             # Calculate position for this column
             x_pos = margin_points + (column_width + column_gap) * col
-            scaled_slice_height = slice_height * scale_factor
 
             if enable_ocr:
                 # Add OCR layer before drawing image
